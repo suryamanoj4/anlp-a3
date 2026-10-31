@@ -9,4 +9,6 @@
 
 Submit only ONE report for the entire assignment, the report should go directly in `docs`
 
+Please note that you must not use AI to write the report.
+
 Will be updated as clarifications are asked.
