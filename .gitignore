@@ -9,3 +9,16 @@ wheels/
 # Virtual environments
 .venv
 
+# Data and model artifacts
+data/
+models/
+logs/
+*.zip
+*.ziop
+
+# Experiment tracking
+wandb/
+runs/
+
+# Secrets
+.env
