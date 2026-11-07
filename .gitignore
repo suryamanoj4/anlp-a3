@@ -10,15 +10,15 @@ wheels/
 .venv
 
 # Data and model artifacts
-data/
-models/
-logs/
+/data/
+/models/
+/logs/
 *.zip
 *.ziop
 
 # Experiment tracking
-wandb/
-runs/
+/wandb/
+/runs/
 
 # Secrets
 .env
