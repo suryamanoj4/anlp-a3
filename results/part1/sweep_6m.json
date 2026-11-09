@@ -1,0 +1,10 @@
+{
+  "arch": "transformer",
+  "parameters": 10929408,
+  "flops": 5682216960,
+  "best_char_accuracy": 0.0069077657587010175,
+  "steps": 3000,
+  "tokens_seen": 6331206,
+  "elapsed_min": 2.5,
+  "checkpoint": "models/part1/sweep_6m.pt"
+}

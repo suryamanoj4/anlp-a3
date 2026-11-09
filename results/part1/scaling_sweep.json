@@ -1,0 +1,51 @@
+{
+  "experiment": "transformer_token_scaling_sweep",
+  "hardware": "Colab T4, fp16 autocast, batch 16",
+  "model": "transformer d_model=384 n_heads=6 n_layers=6 d_ff=1536 params=10929408",
+  "data": "40000 train docs, 400 validation docs, single epoch not exceeded",
+  "evaluation": {
+    "protocol": "generation capped at 128 tokens; rescored on validation documents with reference length 8 to 112 characters",
+    "short_docs": 120,
+    "mean_reference_length": 17.7,
+    "baseline_space_char_accuracy": 0.0843
+  },
+  "runs": [
+    {
+      "name": "sweep_6m",
+      "steps": 3000,
+      "tokens_seen": 6331206,
+      "train_loss": 1.9996,
+      "val_loss": 1.6367,
+      "elapsed_min": 2.5,
+      "char_accuracy_short_docs": 0.0876,
+      "word_accuracy_short_docs": 0.0167
+    },
+    {
+      "name": "sweep_20m",
+      "steps": 9400,
+      "tokens_seen": 19703992,
+      "train_loss": 1.4904,
+      "val_loss": 1.2781,
+      "elapsed_min": 6.56,
+      "char_accuracy_short_docs": 0.0918,
+      "word_accuracy_short_docs": 0.025
+    },
+    {
+      "name": "sweep_64m",
+      "steps": 30000,
+      "tokens_seen": 62871156,
+      "train_loss": 1.1152,
+      "val_loss": 1.2428,
+      "elapsed_min": 19.59,
+      "char_accuracy_short_docs": 0.1121,
+      "word_accuracy_short_docs": 0.05
+    }
+  ],
+  "observations": [
+    "Validation loss falls from 1.6367 to 1.2781 between 6.3M and 19.7M tokens, then only to 1.2428 at 62.9M tokens",
+    "Training loss keeps falling (2.00 to 1.12) while validation loss plateaus, which is the onset of memorisation rather than generalisation",
+    "Predictions are plausible English titles such as composition and, chart performance, service history, unrelated to the reference",
+    "Character accuracy on short documents rises from 8.76 to 11.21 percent against an 8.43 percent constant-space baseline",
+    "The residual gains are consistent with plaintext language modelling, not with recovery of the cipher"
+  ]
+}

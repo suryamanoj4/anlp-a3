@@ -38,7 +38,23 @@ def lr_factor(step, warmup, total):
 
 
 @torch.no_grad()
-def evaluate(model, dataset, tokenizer, cfg, device):
+def validation_loss(model, loader, device, max_batches=60):
+    model.eval()
+    total = 0.0
+    count = 0
+    for input_ids, label_ids, attention_mask in loader:
+        input_ids = input_ids.to(device)
+        label_ids = label_ids.to(device)
+        attention_mask = attention_mask.to(device)
+        total += float(compute_loss(model, input_ids, label_ids, attention_mask))
+        count += 1
+        if count >= max_batches:
+            break
+    return total / max(1, count)
+
+
+@torch.no_grad()
+def evaluate(model, dataset, val_loader, tokenizer, cfg, device):
     model.eval()
     preds = []
     refs = []
@@ -63,6 +79,7 @@ def evaluate(model, dataset, tokenizer, cfg, device):
         "recall": recall,
         "f1": f1,
         "edit_distance": mean_edit_distance(preds, refs),
+        "val_loss": validation_loss(model, val_loader, device),
     }
 
 
@@ -103,6 +120,12 @@ def main():
     )
     loader = DataLoader(
         train_set, batch_sampler=sampler, collate_fn=collate, num_workers=cfg.get("workers", 2)
+    )
+    val_sampler = LengthBucketSampler(
+        val_set.source_lengths, cfg["batch_size"], shuffle=False, seed=cfg["seed"]
+    )
+    val_loader = DataLoader(
+        val_set, batch_sampler=val_sampler, collate_fn=collate, num_workers=0
     )
 
     model = build_model(cfg, tokenizer.vocab_size).to(device)
@@ -182,7 +205,7 @@ def main():
                 if run is not None:
                     run.log(record, step=step)
             if step % cfg["eval_interval"] == 0:
-                metrics = evaluate(model, val_set, tokenizer, cfg, device)
+                metrics = evaluate(model, val_set, val_loader, tokenizer, cfg, device)
                 metrics.update({"step": step, "loss": loss.item(), "split": "validation"})
                 with open(cfg["log_file"], "a", encoding="utf-8") as f:
                     f.write(json.dumps(metrics) + "\n")
