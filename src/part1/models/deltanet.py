@@ -29,23 +29,23 @@ class DeltaNetMixer(nn.Module):
         q = F.silu(q.transpose(1, 2))
         k = F.silu(k.transpose(1, 2))
         v = v.transpose(1, 2)
-        q = F.normalize(q.view(b, t, h, d), dim=-1).transpose(1, 2)
-        k = F.normalize(k.view(b, t, h, d), dim=-1).transpose(1, 2)
+        q = F.normalize(q.view(b, t, h, d).float(), dim=-1).to(x.dtype).transpose(1, 2)
+        k = F.normalize(k.view(b, t, h, d).float(), dim=-1).to(x.dtype).transpose(1, 2)
         v = v.view(b, t, h, d).transpose(1, 2)
         beta = torch.sigmoid(self.beta_proj(x)).transpose(1, 2)
-        state = torch.zeros(b, h, d, d, device=x.device, dtype=x.dtype)
+        state = torch.zeros(b, h, d, d, device=x.device, dtype=torch.float32)
         outputs = []
         for start in range(0, t, self.chunk):
             end = min(start + self.chunk, t)
-            qc = q[:, :, start:end]
-            kc = k[:, :, start:end]
-            vc = v[:, :, start:end]
-            bc = beta[:, :, start:end].unsqueeze(-1)
+            qc = q[:, :, start:end].float()
+            kc = k[:, :, start:end].float()
+            vc = v[:, :, start:end].float()
+            bc = beta[:, :, start:end].float().unsqueeze(-1)
             span = end - start
             kb = kc * bc
             vb = vc * bc
             lower = torch.tril(kc @ kb.transpose(-1, -2), diagonal=-1)
-            eye = torch.eye(span, device=x.device, dtype=x.dtype)
+            eye = torch.eye(span, device=x.device, dtype=torch.float32)
             mat = eye + lower
             w = torch.linalg.solve_triangular(mat, kb, upper=False, unitriangular=True)
             u = torch.linalg.solve_triangular(mat, vb, upper=False, unitriangular=True)
@@ -54,4 +54,4 @@ class DeltaNetMixer(nn.Module):
             outputs.append(qc @ state + intra)
             state = state + kc.transpose(-1, -2) @ u
         out = torch.cat(outputs, dim=2).transpose(1, 2).reshape(b, t, c)
-        return self.o_proj(self.o_norm(out))
+        return self.o_proj(self.o_norm(out.to(x.dtype)))
