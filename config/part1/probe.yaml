@@ -1,0 +1,42 @@
+seed: 0
+arch: transformer
+data_root: data/part1
+train_split: train
+val_split: validation
+max_tokens: 8000000
+val_max_docs: 200
+max_source_len: 128
+max_target_len: 112
+vocab_sample: 2000
+
+d_model: 128
+n_heads: 4
+n_layers: 4
+d_ff: 512
+dropout: 0.1
+max_position: 512
+d_state: 8
+expand: 4
+chunk: 64
+checkpoint_scan: true
+
+batch_size: 32
+lr: 0.0005
+weight_decay: 0.01
+grad_clip: 1.0
+warmup_steps: 100
+max_steps: 1500
+max_minutes: 8
+eval_interval: 250
+log_interval: 20
+gen_samples: 50
+max_new_tokens: 128
+precision: fp16
+workers: 2
+
+out_dir: output/part1
+log_file: logs/part1/probe.jsonl
+run_name: probe
+wandb: false
+wandb_project: anlp-a3
+hf_pull: false
