@@ -62,3 +62,39 @@ Character accuracy, word accuracy, macro precision/recall/F1 over characters, me
 distance, parameter count and analytic FLOPs. Macro averaging is used because a symbol-to-symbol
 mapping has no natural positive class. FLOPs are analytic and reported for a single forward pass at
 the maximum sequence length.
+
+## Measured throughput on the target hardware
+
+Measured on a Colab T4 with fp16 autocast, batch 16, length-bucketed batches. These numbers set the
+step budget, and they replace the earlier estimates.
+
+| Architecture | Tokens per second | Approximate time for 3000 steps |
+|---|---|---|
+| Transformer | ~64000 | ~2 min |
+| DeltaNet | ~4000 | ~25 min |
+| Mamba, faithful settings | ~1900 | ~57 min |
+| Mamba, tuned settings | ~4100 | ~26 min |
+| Hybrid | ~1900 | ~50 min |
+
+The Transformer is an order of magnitude faster per token than the recurrent mixers at these
+sequence lengths. Sequences are short (about 134 tokens after bucketing), so the quadratic attention
+term is negligible and the linear-time architectures pay their sequential-scan cost without
+collecting their long-context benefit. This is a property of the task and hardware, not of the
+implementations, and it is reported rather than hidden.
+
+## Mamba deviations forced by memory and time
+
+Two deviations from the paper's defaults are used, both recorded here:
+
+- `d_state=8` instead of 16. This changes only the size of the `A` parameter and the state width; it
+  is the difference between fitting in 14.5 GB and not fitting.
+- The scan is not gradient-checkpointed, and `scan_chunk=32` instead of 16. Checkpointing a naive
+  chunked scan roughly doubles the time and was measured at 1883 tokens per second; without it, and
+  with 32-step chunks, the same model reaches about 4147 tokens per second. The larger chunk is safe
+  because with `d_state=8` the accumulated decay stays within fp32 range.
+
+`max_steps=3000` with `batch_size=16` is therefore the budget that all four architectures can
+complete in roughly the same wall-clock window. Steps and batch size are held equal across
+architectures so that the comparison is of architectures rather than of optimisation budgets; tokens
+seen and FLOPs are reported alongside.
+
