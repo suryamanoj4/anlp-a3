@@ -21,7 +21,8 @@ def forward_backward(kind, vocab_size=64, length=48, batch=2):
     model.train()
     input_ids = torch.randint(0, vocab_size, (batch, length))
     attention_mask = torch.ones(batch, length, dtype=torch.long)
-    attention_mask[1, length // 2:] = 0
+    if batch > 1:
+        attention_mask[1, length // 2:] = 0
     logits = model(input_ids, attention_mask)
     assert logits.shape == (batch, length, vocab_size), (kind, tuple(logits.shape))
     assert torch.isfinite(logits).all(), f"{kind}: non-finite logits"
