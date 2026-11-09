@@ -1,8 +1,18 @@
 [project]
-name = "a3-boilerplate"
+name = "anlp-a3"
 version = "0.1.0"
-description = "Add your description here"
+description = "ANLP Assignment 3"
 readme = "README.md"
-requires-python = ">=3.14"
-dependencies = []
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.4",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "huggingface-hub>=0.24",
+    "wandb>=0.18",
+    "tqdm>=4.66",
+]
 
+[tool.uv]
+package = false
