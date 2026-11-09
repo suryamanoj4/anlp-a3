@@ -3,6 +3,8 @@ import json
 
 class Tokenizer:
     def __init__(self, source_chars, target_chars):
+        self.source_chars = list(source_chars)
+        self.target_chars = list(target_chars)
         self.pad_id = 0
         self.sep_id = 1
         self.eos_id = 2
