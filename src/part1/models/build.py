@@ -20,7 +20,7 @@ def build_model(cfg, vocab_size):
         )
     if arch == "mamba":
         mixers = [
-            (MambaMixer(d_model, cfg.get("d_state", 16), expand=cfg.get("expand", 4), checkpoint_scan=cfg.get("checkpoint_scan", True)), False)
+            (MambaMixer(d_model, cfg.get("d_state", 16), expand=cfg.get("expand", 4), scan_chunk=cfg.get("scan_chunk", 16), checkpoint_scan=cfg.get("checkpoint_scan", True)), False)
             for _ in range(n_layers)
         ]
     elif arch == "deltanet":
@@ -32,7 +32,7 @@ def build_model(cfg, vocab_size):
         mixers = []
         for i in range(n_layers):
             if i % 2 == 0:
-                mixers.append((MambaMixer(d_model, cfg.get("d_state", 16), expand=cfg.get("expand", 4), checkpoint_scan=cfg.get("checkpoint_scan", True)), False))
+                mixers.append((MambaMixer(d_model, cfg.get("d_state", 16), expand=cfg.get("expand", 4), scan_chunk=cfg.get("scan_chunk", 16), checkpoint_scan=cfg.get("checkpoint_scan", True)), False))
             else:
                 mixers.append((DeltaNetMixer(d_model, cfg["n_heads"], cfg.get("chunk", 64)), True))
     else:
