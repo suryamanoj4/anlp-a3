@@ -1,21 +1,36 @@
 import json
+import math
 
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Sampler
 
 
 def build_offsets(path, limit=None):
     offsets = []
+    lengths = []
     with open(path, "rb") as f:
         position = f.tell()
         line = f.readline()
-        while line:
+        while line and (limit is None or len(offsets) < limit):
             offsets.append(position)
+            lengths.append(len(line))
             position = f.tell()
             line = f.readline()
-            if limit is not None and len(offsets) >= limit:
+    return offsets, lengths
+
+
+def limit_for_tokens(path, max_tokens):
+    if max_tokens is None:
+        return None
+    total = 0
+    count = 0
+    with open(path, "rb") as f:
+        for line in f:
+            if total >= max_tokens:
                 break
-    return offsets
+            total += len(line)
+            count += 1
+    return count
 
 
 def read_at(path, offsets, index):
@@ -25,13 +40,14 @@ def read_at(path, offsets, index):
 
 
 class CipherPairs(Dataset):
-    def __init__(self, root, split, max_source_len, max_target_len, limit=None):
+    def __init__(self, root, split, max_tokens=None, max_docs=None):
         self.source_path = f"{root}/{split}/cipher.jsonl"
         self.target_path = f"{root}/{split}/cleaned.jsonl"
-        self.source_offsets = build_offsets(self.source_path, limit)
-        self.target_offsets = build_offsets(self.target_path, limit)
-        self.max_source_len = max_source_len
-        self.max_target_len = max_target_len
+        limit = limit_for_tokens(self.target_path, max_tokens)
+        if max_docs is not None:
+            limit = max_docs if limit is None else min(limit, max_docs)
+        self.source_offsets, self.source_lengths = build_offsets(self.source_path, limit)
+        self.target_offsets, _ = build_offsets(self.target_path, limit)
 
     def __len__(self):
         return min(len(self.source_offsets), len(self.target_offsets))
@@ -40,6 +56,34 @@ class CipherPairs(Dataset):
         source = read_at(self.source_path, self.source_offsets, index)["ciphertext"]
         target = read_at(self.target_path, self.target_offsets, index)["text"]
         return source, target
+
+
+class LengthBucketSampler(Sampler):
+    def __init__(self, lengths, batch_size, shuffle=True, seed=0):
+        self.lengths = list(lengths)
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.seed = seed
+        self.epoch = 0
+
+    def set_epoch(self, epoch):
+        self.epoch = epoch
+
+    def __len__(self):
+        return math.ceil(len(self.lengths) / self.batch_size)
+
+    def __iter__(self):
+        order = sorted(range(len(self.lengths)), key=lambda i: self.lengths[i])
+        batches = [
+            order[i:i + self.batch_size] for i in range(0, len(order), self.batch_size)
+        ]
+        if self.shuffle:
+            generator = torch.Generator()
+            generator.manual_seed(self.seed + self.epoch)
+            permutation = torch.randperm(len(batches), generator=generator).tolist()
+            batches = [batches[i] for i in permutation]
+        for batch in batches:
+            yield batch
 
 
 def make_collate(tokenizer, max_source_len, max_target_len):
