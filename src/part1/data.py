@@ -86,13 +86,19 @@ class LengthBucketSampler(Sampler):
             yield batch
 
 
-def make_collate(tokenizer, max_source_len, max_target_len):
-    def collate(batch):
+class Collate:
+    def __init__(self, tokenizer, max_source_len, max_target_len):
+        self.tokenizer = tokenizer
+        self.max_source_len = max_source_len
+        self.max_target_len = max_target_len
+
+    def __call__(self, batch):
+        tokenizer = self.tokenizer
         inputs = []
         labels = []
         for source, target in batch:
-            s = tokenizer.encode_source(source)[:max_source_len]
-            t = tokenizer.encode_target(target)[:max_target_len]
+            s = tokenizer.encode_source(source)[: self.max_source_len]
+            t = tokenizer.encode_target(target)[: self.max_target_len]
             ids = s + [tokenizer.sep_id] + t + [tokenizer.eos_id]
             lab = [-100] * (len(s) + 1) + t + [tokenizer.eos_id]
             inputs.append(ids)
@@ -106,4 +112,7 @@ def make_collate(tokenizer, max_source_len, max_target_len):
             label_ids[i, :len(lab)] = torch.tensor(lab)
             attention_mask[i, :len(ids)] = 1
         return input_ids, label_ids, attention_mask
-    return collate
+
+
+def make_collate(tokenizer, max_source_len, max_target_len):
+    return Collate(tokenizer, max_source_len, max_target_len)
