@@ -89,6 +89,35 @@ distance, parameter count and analytic FLOPs. Macro averaging is used because a 
 mapping has no natural positive class. FLOPs are analytic and reported for a single forward pass at
 the maximum sequence length.
 
+## Fused selective scan in Triton
+
+The eager scan materialises the discretised recurrence as `batch x time x d_inner x d_state` tensors
+and walks the sequence in Python-level chunks. At `d_inner=1536`, `d_state=8`, `batch=16` and
+`time=240` that is roughly 47 million float32 elements per intermediate, and the measured efficiency is
+about 0.5 percent of the device peak, because the work is memory traffic rather than arithmetic.
+
+The Triton kernel assigns one program to each `(batch, channel)` pair. The `N`-dimensional state for
+that channel is carried in registers across the whole sequence, so no intermediate state tensor is
+written:
+
+```
+h = 0
+for t in range(T):
+    a  = exp(delta[t] * A)
+    h  = a * h + delta[t] * B[t] * x[t]
+    y[t] = sum(h * C[t])
+```
+
+Forward writes only the output and the state history. Backward runs the adjoint recurrence in reverse,
+`g_t = C_t * dy_t + a_{t+1} * g_{t+1}`, from which the gradients follow as `dx_t = delta_t * (B_t . g_t)`,
+`ddelta_t = g_t . (A * a_t * h_{t-1} + B_t * x_t)`, `dB_t = g_t * delta_t * x_t`, `dC_t = dy_t * h_t`,
+and `dA = sum_t g_t * delta_t * a_t * h_{t-1}`, the last accumulated across the batch with atomics
+because `A` is shared.
+
+Everything is computed in float32 regardless of autocast, because the decay product underflows in half
+precision. `src/part1/check_scan.py` compares the kernel against the eager implementation on both the
+forward output and every parameter gradient before the flag is enabled.
+
 ## Measured throughput on the target hardware
 
 Measured on a Colab T4 with fp16 autocast, batch 16, length-bucketed batches. These numbers set the
