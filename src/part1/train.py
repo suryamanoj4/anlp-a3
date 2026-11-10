@@ -128,8 +128,9 @@ def main():
         val_set, batch_sampler=val_sampler, collate_fn=collate, num_workers=0
     )
 
-    model = build_model(cfg, tokenizer.vocab_size).to(device)
-    params = count_parameters(model)
+    raw_model = build_model(cfg, tokenizer.vocab_size).to(device)
+    model = torch.compile(raw_model, dynamic=True) if cfg.get("compile") else raw_model
+    params = count_parameters(raw_model)
     flops = estimate_flops(cfg, cfg["max_source_len"] + cfg["max_target_len"], tokenizer.vocab_size)
     print(json.dumps({"arch": cfg.get("arch"), "parameters": params, "flops": flops}))
 
@@ -217,7 +218,7 @@ def main():
                     best = metrics["char_accuracy"]
                     torch.save(
                         {
-                            "model": model.state_dict(),
+                            "model": raw_model.state_dict(),
                             "config": cfg,
                             "source_chars": tokenizer.source_chars,
                             "target_chars": tokenizer.target_chars,
@@ -228,6 +229,20 @@ def main():
                     )
                 model.train()
         epoch += 1
+
+    if best < 0:
+        best = 0.0
+        torch.save(
+            {
+                "model": raw_model.state_dict(),
+                "config": cfg,
+                "source_chars": tokenizer.source_chars,
+                "target_chars": tokenizer.target_chars,
+                "step": step,
+                "char_accuracy": best,
+            },
+            f"models/part1/{cfg['run_name']}.pt",
+        )
 
     summary = {
         "arch": cfg.get("arch"),
