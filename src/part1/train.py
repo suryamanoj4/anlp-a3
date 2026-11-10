@@ -166,7 +166,8 @@ def main():
     best = -1.0
     tokens_seen = 0
     started = time.time()
-    deadline = started + cfg["max_minutes"] * 60
+    minutes = cfg.get("max_minutes")
+    deadline = started + minutes * 60 if minutes else float("inf")
     epoch = 0
     model.train()
     while step < cfg["max_steps"] and time.time() < deadline:
@@ -197,8 +198,10 @@ def main():
                 elapsed = time.time() - started
                 record = {
                     "step": step,
+                    "epoch": epoch,
                     "loss": round(loss.item(), 4),
                     "lr": scheduler.get_last_lr()[0],
+                    "tokens_seen": tokens_seen,
                     "tokens_per_sec": round(tokens_seen / max(elapsed, 1e-6), 1),
                     "elapsed_min": round(elapsed / 60, 2),
                 }
@@ -259,6 +262,7 @@ def main():
         json.dump(summary, f, indent=2)
     print(json.dumps(summary))
     if run is not None:
+        run.log({k: v for k, v in summary.items() if isinstance(v, (int, float))})
         run.finish()
     if args.push:
         from .hf import push_checkpoint
