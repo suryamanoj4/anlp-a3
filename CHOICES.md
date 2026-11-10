@@ -123,19 +123,29 @@ forward output and every parameter gradient before the flag is enabled.
 Measured on a Colab T4 with fp16 autocast, batch 16, length-bucketed batches. These numbers set the
 step budget, and they replace the earlier estimates.
 
-| Architecture | Tokens per second | Approximate time for 3000 steps |
-|---|---|---|
-| Transformer | ~64000 | ~2 min |
-| DeltaNet | ~4000 | ~25 min |
-| Mamba, faithful settings | ~1900 | ~57 min |
-| Mamba, tuned settings | ~4100 | ~26 min |
-| Hybrid | ~1900 | ~50 min |
+| Architecture | Scan implementation | Tokens per second | 9200 steps |
+|---|---|---|---|
+| Transformer | eager | 42131 | 7.7 min |
+| DeltaNet | eager | 16657 | 19.6 min |
+| Mamba | eager | 3862 | 84.3 min |
+| Mamba | **triton** | **8384** | **38.8 min** |
+| Hybrid | eager | 6682 | 48.7 min |
+| Hybrid | **triton** | **11306** | **28.8 min** |
 
-The Transformer is an order of magnitude faster per token than the recurrent mixers at these
-sequence lengths. Sequences are short (about 134 tokens after bucketing), so the quadratic attention
-term is negligible and the linear-time architectures pay their sequential-scan cost without
-collecting their long-context benefit. This is a property of the task and hardware, not of the
-implementations, and it is reported rather than hidden.
+The fused scan gives 2.17 times on Mamba and 1.69 times on the hybrid. Training loss after 100 steps is
+identical to four decimal places between the eager and fused paths (2.4908 and 2.4536 respectively),
+which is the in-situ confirmation of the gradient parity test. With the fused scan the four-model sweep
+costs about 1 hour 46 minutes instead of 2 hours 57 minutes.
+
+`torch.compile` was measured and rejected: it raised a Dynamo error on the Transformer and spent more
+than five minutes compiling DeltaNet at zero GPU utilisation, which is not acceptable for a one-shot
+training run. The flag remains in the code but is disabled in every configuration.
+
+The Transformer remains roughly five times faster per token than the fastest recurrent mixer.
+Sequences are short (about 134 tokens after bucketing), so the quadratic attention term is negligible
+and the linear-time architectures pay their sequential-scan cost without collecting their long-context
+benefit. This is a property of the task and hardware, not of the implementations, and it is reported
+rather than hidden.
 
 ## Mamba deviations forced by memory and time
 
