@@ -56,6 +56,20 @@ underflows in half precision and an inverted triangular matrix in half precision
 Mamba's scan is gradient-checkpointed, since a naive implementation retains `batch x length x
 d_inner x d_state` tensors per layer and would exceed the memory of an 11 GB card.
 
+## Checkpoint selection and evaluation timing
+
+Training is budgeted by step count, not wall clock, so the number of optimisation steps is identical on
+any hardware and the comparison is not affected by machine speed. Wall-clock time is recorded and
+reported as an outcome.
+
+Checkpoints are selected by validation loss, measured every 500 steps. Validation loss is a
+teacher-forced pass over a fixed set of validation batches: it costs seconds, has low variance, and is
+available at every checkpoint. Character accuracy, word accuracy, precision, recall, F1 and Levenshtein
+distance require autoregressive generation, which is roughly an order of magnitude more expensive and
+much noisier at fifty samples, so those metrics are computed once after training on the selected
+checkpoint. The training loop therefore logs loss, learning rate, throughput and validation loss to
+Weights and Biases, and the metrics table is produced by `src/part1/evaluate.py`.
+
 ## Metrics
 
 Character accuracy, word accuracy, macro precision/recall/F1 over characters, mean Levenshtein

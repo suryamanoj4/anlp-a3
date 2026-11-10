@@ -13,8 +13,6 @@ from . import env
 from .config import load_config
 from .data import CipherPairs, LengthBucketSampler, make_collate
 from .flops import count_parameters, estimate_flops
-from .generate import generate_ids
-from .metrics import char_accuracy, macro_prf, mean_edit_distance, word_accuracy
 from .models.build import build_model
 from .tokenizer import Tokenizer
 
@@ -51,36 +49,6 @@ def validation_loss(model, loader, device, max_batches=60):
         if count >= max_batches:
             break
     return total / max(1, count)
-
-
-@torch.no_grad()
-def evaluate(model, dataset, val_loader, tokenizer, cfg, device):
-    model.eval()
-    preds = []
-    refs = []
-    for i in range(min(cfg["gen_samples"], len(dataset))):
-        source, target = dataset[i]
-        ids = tokenizer.encode_source(source)[: cfg["max_source_len"]]
-        out = generate_ids(
-            model,
-            ids,
-            cfg["max_new_tokens"],
-            tokenizer.eos_id,
-            tokenizer.sep_id,
-            device,
-        )
-        preds.append(tokenizer.decode_target(out))
-        refs.append(target)
-    precision, recall, f1 = macro_prf(preds, refs)
-    return {
-        "char_accuracy": char_accuracy(preds, refs),
-        "word_accuracy": word_accuracy(preds, refs),
-        "precision": precision,
-        "recall": recall,
-        "f1": f1,
-        "edit_distance": mean_edit_distance(preds, refs),
-        "val_loss": validation_loss(model, val_loader, device),
-    }
 
 
 def main():
@@ -163,7 +131,8 @@ def main():
         )
 
     step = 0
-    best = -1.0
+    best = float("inf")
+    saved = False
     tokens_seen = 0
     started = time.time()
     minutes = cfg.get("max_minutes")
@@ -209,16 +178,21 @@ def main():
                 if run is not None:
                     run.log(record, step=step)
             if step % cfg["eval_interval"] == 0:
-                metrics = evaluate(model, val_set, val_loader, tokenizer, cfg, device)
-                metrics.update({"step": step, "loss": loss.item(), "split": "validation"})
+                val = validation_loss(model, val_loader, device)
+                metrics = {
+                    "step": step,
+                    "split": "validation",
+                    "val_loss": val,
+                    "train_loss": loss.item(),
+                }
                 with open(cfg["log_file"], "a", encoding="utf-8") as f:
                     f.write(json.dumps(metrics) + "\n")
-                print(json.dumps({k: (round(v, 4) if isinstance(v, float) else v) for k, v in metrics.items()}))
+                print(json.dumps(metrics))
                 if run is not None:
-                    logged = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
-                    run.log(logged, step=step)
-                if metrics["char_accuracy"] > best:
-                    best = metrics["char_accuracy"]
+                    run.log(metrics, step=step)
+                if val < best:
+                    best = val
+                    saved = True
                     torch.save(
                         {
                             "model": raw_model.state_dict(),
@@ -226,15 +200,14 @@ def main():
                             "source_chars": tokenizer.source_chars,
                             "target_chars": tokenizer.target_chars,
                             "step": step,
-                            "char_accuracy": best,
+                            "val_loss": best,
                         },
                         f"models/part1/{cfg['run_name']}.pt",
                     )
                 model.train()
         epoch += 1
 
-    if best < 0:
-        best = 0.0
+    if not saved:
         torch.save(
             {
                 "model": raw_model.state_dict(),
@@ -242,7 +215,7 @@ def main():
                 "source_chars": tokenizer.source_chars,
                 "target_chars": tokenizer.target_chars,
                 "step": step,
-                "char_accuracy": best,
+                "val_loss": best,
             },
             f"models/part1/{cfg['run_name']}.pt",
         )
@@ -251,7 +224,7 @@ def main():
         "arch": cfg.get("arch"),
         "parameters": params,
         "flops": flops,
-        "best_char_accuracy": best,
+        "best_val_loss": best if saved else None,
         "steps": step,
         "tokens_seen": tokens_seen,
         "elapsed_min": round((time.time() - started) / 60, 2),

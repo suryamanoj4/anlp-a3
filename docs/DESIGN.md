@@ -9,6 +9,10 @@ the intended design. No implementation and no experiment ever used a bidirection
 code under `src/part1` is and was compliant with the design recorded here. The correction is disclosed
 rather than made silently.
 
+A second refinement is disclosed for the same reason: checkpoints are selected by validation loss
+rather than by validation character accuracy. Generation-based scoring is expensive and high-variance,
+so it is computed once, after training, on the selected checkpoint.
+
 ## 1. Task framing
 
 The data is a set of aligned plaintext/ciphertext pairs. Ciphertext is about 1.13 times longer than
@@ -116,8 +120,9 @@ whitespace tokens after decoding. Levenshtein distance is the mean per-sequence 
 
 Comparisons use a matched parameter budget, the same vocabulary, the same sequence-length caps, the
 same optimiser, the same step budget and the same seed set. The checkpoint with the best validation
-character accuracy is the one evaluated, matching the protocol required in Part B. All runs are
-logged to Weights and Biases.
+loss is the one evaluated; character accuracy, word accuracy, precision, recall, F1 and Levenshtein
+distance are computed once, after training, on that checkpoint. Validation loss is measured every 500
+steps. All runs are logged to Weights and Biases.
 
 **Milestone 0: learnability probe.** Before the four models are built, the smallest Transformer is
 trained on a subsample to check that the mapping is learnable at all. The probe passes if validation
