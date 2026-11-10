@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from . import env
 from .config import load_config
 from .data import CipherPairs, LengthBucketSampler, make_collate
+from .evaluate import generation_metrics
 from .flops import count_parameters, estimate_flops
 from .models.build import build_model
 from .tokenizer import Tokenizer
@@ -231,6 +232,30 @@ def main():
         "checkpoint": f"models/part1/{cfg['run_name']}.pt",
     }
     os.makedirs("results/part1", exist_ok=True)
+    if saved and cfg.get("final_eval", True):
+        payload = torch.load(
+            f"models/part1/{cfg['run_name']}.pt", map_location=device, weights_only=False
+        )
+        raw_model.load_state_dict(payload["model"])
+        evaluator_started = time.time()
+        test_metrics = generation_metrics(
+            raw_model,
+            tokenizer,
+            cfg,
+            cfg.get("eval_split", "test"),
+            cfg.get("eval_limit", 300),
+            cfg.get("eval_all_lengths", False),
+            device,
+        )
+        test_metrics["eval_minutes"] = round((time.time() - evaluator_started) / 60, 2)
+        summary["test"] = test_metrics
+        with open(f"results/part1/{cfg['run_name']}_{cfg.get('eval_split', 'test')}.json", "w", encoding="utf-8") as f:
+            json.dump(test_metrics, f, indent=2)
+        print(json.dumps({"test": test_metrics}))
+        if run is not None:
+            run.log(
+                {f"test/{k}": v for k, v in test_metrics.items() if isinstance(v, (int, float))}
+            )
     with open(f"results/part1/{cfg['run_name']}.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
     print(json.dumps(summary))

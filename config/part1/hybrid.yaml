@@ -43,3 +43,7 @@ run_name: hybrid
 wandb: true
 wandb_project: anlp-a3
 hf_pull: true
+final_eval: true
+eval_split: test
+eval_limit: 300
+eval_all_lengths: false

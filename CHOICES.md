@@ -78,9 +78,14 @@ Checkpoints are selected by validation loss, measured every 500 steps. Validatio
 teacher-forced pass over a fixed set of validation batches: it costs seconds, has low variance, and is
 available at every checkpoint. Character accuracy, word accuracy, precision, recall, F1 and Levenshtein
 distance require autoregressive generation, which is roughly an order of magnitude more expensive and
-much noisier at fifty samples, so those metrics are computed once after training on the selected
-checkpoint. The training loop therefore logs loss, learning rate, throughput and validation loss to
-Weights and Biases, and the metrics table is produced by `src/part1/evaluate.py`.
+much noisier at fifty samples, so those metrics are computed once, at the end of training, on the best
+checkpoint.
+
+That final evaluation runs inside the training process, so a single Weights and Biases run contains the
+training curves, the validation-loss curve and the test metrics together. A separate standalone entry
+point, `src/part1/evaluate.py`, re-scores a saved checkpoint without retraining, which is useful if a
+model needs to be re-evaluated on a different split or limit. The training loop logs loss, learning
+rate, throughput and validation loss, then the test metrics under a `test/` prefix.
 
 ## Metrics
 
