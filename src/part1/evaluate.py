@@ -1,0 +1,77 @@
+import argparse
+import json
+import os
+
+import torch
+
+from .config import load_config
+from .data import CipherPairs
+from .flops import count_parameters, estimate_flops
+from .generate import generate_ids
+from .infer import load_model
+from .metrics import char_accuracy, mean_edit_distance, macro_prf, word_accuracy
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True)
+    parser.add_argument("--checkpoint", default=None)
+    parser.add_argument("--split", default="test")
+    parser.add_argument("--limit", type=int, default=300)
+    parser.add_argument("--all-lengths", action="store_true")
+    parser.add_argument("--output", default=None)
+    args = parser.parse_args()
+    cfg = load_config(args.config)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    checkpoint = args.checkpoint or f"models/part1/{cfg['run_name']}.pt"
+    model, tokenizer, model_cfg = load_model(checkpoint, device)
+    data = CipherPairs(cfg["data_root"], args.split)
+
+    preds = []
+    refs = []
+    for i in range(len(data)):
+        if len(preds) >= args.limit:
+            break
+        source, target = data[i]
+        if not args.all_lengths and len(target) > model_cfg["max_target_len"]:
+            continue
+        ids = tokenizer.encode_source(source)[: model_cfg["max_source_len"]]
+        out = generate_ids(
+            model,
+            ids,
+            model_cfg["max_new_tokens"],
+            tokenizer.eos_id,
+            tokenizer.sep_id,
+            device,
+        )
+        preds.append(tokenizer.decode_target(out))
+        refs.append(target)
+
+    precision, recall, f1 = macro_prf(preds, refs)
+    result = {
+        "arch": cfg.get("arch"),
+        "split": args.split,
+        "documents": len(preds),
+        "short_only": not args.all_lengths,
+        "char_accuracy": char_accuracy(preds, refs),
+        "word_accuracy": word_accuracy(preds, refs),
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "edit_distance": mean_edit_distance(preds, refs),
+        "parameters": count_parameters(model),
+        "flops": estimate_flops(
+            model_cfg,
+            model_cfg["max_source_len"] + model_cfg["max_target_len"],
+            tokenizer.vocab_size,
+        ),
+    }
+    output = args.output or f"results/part1/{cfg['run_name']}_{args.split}.json"
+    os.makedirs(os.path.dirname(output), exist_ok=True)
+    with open(output, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2)
+    print(json.dumps(result))
+
+
+if __name__ == "__main__":
+    main()
