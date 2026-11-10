@@ -3,6 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 
+try:
+    from .mamba_scan_triton import scan_triton
+except ImportError:
+    scan_triton = None
+
 
 class MambaMixer(nn.Module):
     def __init__(
@@ -14,6 +19,7 @@ class MambaMixer(nn.Module):
         dt_rank=None,
         scan_chunk=16,
         checkpoint_scan=True,
+        triton_scan=False,
     ):
         super().__init__()
         self.d_inner = expand * d_model
@@ -21,6 +27,7 @@ class MambaMixer(nn.Module):
         self.dt_rank = dt_rank or max(1, d_model // 16)
         self.scan_chunk = scan_chunk
         self.checkpoint_scan = checkpoint_scan
+        self.triton_scan = bool(triton_scan and scan_triton is not None)
         self.in_proj = nn.Linear(d_model, 2 * self.d_inner)
         self.conv1d = nn.Conv1d(
             self.d_inner, self.d_inner, d_conv, groups=self.d_inner, padding=d_conv - 1
@@ -41,8 +48,10 @@ class MambaMixer(nn.Module):
         projected = self.x_proj(u)
         delta, bmat, cmat = projected.split([self.dt_rank, self.d_state, self.d_state], dim=-1)
         delta = F.softplus(self.dt_proj(delta)).clamp(1e-4, 0.1)
-        A = -torch.exp(self.A_log).to(delta.dtype)
-        if self.training and self.checkpoint_scan:
+        A = -torch.exp(self.A_log.float())
+        if self.triton_scan and u.is_cuda:
+            y = scan_triton(u, delta, bmat, cmat, A)
+        elif self.training and self.checkpoint_scan:
             y = checkpoint(self.scan, u, delta, bmat, cmat, A, use_reentrant=False)
         else:
             y = self.scan(u, delta, bmat, cmat, A)
