@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from . import env
 from .config import load_config
-from .data import CipherPairs, LengthBucketSampler, make_collate
+from .data import CipherPairs, LengthBucketSampler, PatchedPairs, limit_for_tokens, make_collate
 from .evaluate import generation_metrics
 from .flops import count_parameters, estimate_flops
 from .models.build import build_model
@@ -77,25 +77,58 @@ def main():
         f"{root}/{cfg['train_split']}/cleaned.jsonl",
         cfg["vocab_sample"],
     )
-    train_set = CipherPairs(
-        root, cfg["train_split"], cfg.get("max_tokens"), cfg.get("max_docs")
-    )
-    val_set = CipherPairs(
-        root, cfg["val_split"], cfg.get("val_max_tokens"), cfg.get("val_max_docs")
-    )
-    collate = make_collate(tokenizer, cfg["max_source_len"], cfg["max_target_len"])
-    sampler = LengthBucketSampler(
-        train_set.source_lengths, cfg["batch_size"], shuffle=True, seed=cfg["seed"]
-    )
-    loader = DataLoader(
-        train_set, batch_sampler=sampler, collate_fn=collate, num_workers=cfg.get("workers", 2)
-    )
-    val_sampler = LengthBucketSampler(
-        val_set.source_lengths, cfg["batch_size"], shuffle=False, seed=cfg["seed"]
-    )
-    val_loader = DataLoader(
-        val_set, batch_sampler=val_sampler, collate_fn=collate, num_workers=0
-    )
+    train_set = None
+    val_set = None
+    sampler = None
+    patch_size = cfg.get("patch_size")
+    if patch_size:
+        train_docs = cfg.get("max_docs")
+        if train_docs is None and cfg.get("max_tokens"):
+            train_docs = limit_for_tokens(
+                f"{root}/{cfg['train_split']}/cleaned.jsonl", cfg["max_tokens"]
+            )
+        val_docs = cfg.get("val_max_docs")
+        if val_docs is None and cfg.get("val_max_tokens"):
+            val_docs = limit_for_tokens(
+                f"{root}/{cfg['val_split']}/cleaned.jsonl", cfg["val_max_tokens"]
+            )
+        train_set = PatchedPairs(root, cfg["train_split"], patch_size, train_docs)
+        val_set = PatchedPairs(root, cfg["val_split"], patch_size, val_docs)
+        collate = make_collate(tokenizer, patch_size, patch_size)
+        loader = DataLoader(
+            train_set,
+            batch_size=cfg["batch_size"],
+            shuffle=True,
+            collate_fn=collate,
+            num_workers=cfg.get("workers", 2),
+        )
+        val_loader = DataLoader(
+            val_set,
+            batch_size=cfg["batch_size"],
+            shuffle=False,
+            collate_fn=collate,
+            num_workers=0,
+        )
+    else:
+        train_set = CipherPairs(
+            root, cfg["train_split"], cfg.get("max_tokens"), cfg.get("max_docs")
+        )
+        val_set = CipherPairs(
+            root, cfg["val_split"], cfg.get("val_max_tokens"), cfg.get("val_max_docs")
+        )
+        collate = make_collate(tokenizer, cfg["max_source_len"], cfg["max_target_len"])
+        sampler = LengthBucketSampler(
+            train_set.source_lengths, cfg["batch_size"], shuffle=True, seed=cfg["seed"]
+        )
+        loader = DataLoader(
+            train_set, batch_sampler=sampler, collate_fn=collate, num_workers=cfg.get("workers", 2)
+        )
+        val_sampler = LengthBucketSampler(
+            val_set.source_lengths, cfg["batch_size"], shuffle=False, seed=cfg["seed"]
+        )
+        val_loader = DataLoader(
+            val_set, batch_sampler=val_sampler, collate_fn=collate, num_workers=0
+        )
 
     raw_model = build_model(cfg, tokenizer.vocab_size).to(device)
     model = torch.compile(raw_model, dynamic=True) if cfg.get("compile") else raw_model
@@ -141,7 +174,8 @@ def main():
     epoch = 0
     model.train()
     while step < cfg["max_steps"] and time.time() < deadline:
-        sampler.set_epoch(epoch)
+        if sampler is not None:
+            sampler.set_epoch(epoch)
         for input_ids, label_ids, attention_mask in loader:
             if step >= cfg["max_steps"] or time.time() >= deadline:
                 break

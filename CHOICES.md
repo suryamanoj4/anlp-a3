@@ -22,6 +22,28 @@ A dedicated unknown token is used for source characters outside the vocabulary. 
 character was silently mapped to whichever source symbol sorts first, which would corrupt held-out
 input; now it is an explicit token. Unknown target tokens are dropped during decoding.
 
+## Patch training
+
+Removing punctuation makes the cipher-to-plaintext mapping exactly one symbol per symbol, and the
+corpus shows no cross-character dependence: within-document mapping purity is 0.0679 against 0.0678 for
+a shuffled control, i.e. indistinguishable. There is therefore no long-range structure to preserve, so
+documents are split into aligned patches of 128 characters. A patch is `128 source` followed by
+`128 target`, and the two are aligned by construction because the stripped ciphertext has the same
+length as its plaintext.
+
+This replaces truncating each document to its first 128 characters, which discarded 93 percent of the
+corpus. The 12,000-document slice contains 89,078 patches, about 23 million tokens per epoch, against
+1.57 million when whole documents were truncated. Every character is covered exactly once per epoch,
+memory is bounded by the patch size rather than by the longest document, and padding waste disappears.
+
+The same property makes evaluation simpler: a document is decoded by running consecutive 128-character
+patches and concatenating the outputs, so long test documents can be scored in full instead of being
+skipped. Patches are capped at 32 per document during evaluation to bound the cost.
+
+The trade-off is that a patch cannot see beyond its own boundaries. That is acceptable only because the
+mapping has been measured to be position-independent; if the cipher had any cross-character dependence,
+this design would discard it. This assumption is reported rather than left implicit.
+
 ## Task formulation
 
 A causal decoder over `[ciphertext][SEP][plaintext][EOS]`, with the loss applied only to the

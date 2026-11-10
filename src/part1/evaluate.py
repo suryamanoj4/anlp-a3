@@ -7,7 +7,7 @@ import torch
 from .config import load_config
 from .data import CipherPairs
 from .flops import count_parameters, estimate_flops
-from .generate import generate_ids
+from .generate import decode_document
 from .infer import load_model
 from .metrics import char_accuracy, mean_edit_distance, macro_prf, word_accuracy
 
@@ -15,6 +15,7 @@ from .metrics import char_accuracy, mean_edit_distance, macro_prf, word_accuracy
 def generation_metrics(model, tokenizer, cfg, split, limit, all_lengths, device):
     model.eval()
     data = CipherPairs(cfg["data_root"], split)
+    max_chunks = cfg.get("eval_max_chunks")
     preds = []
     refs = []
     for i in range(len(data)):
@@ -23,16 +24,7 @@ def generation_metrics(model, tokenizer, cfg, split, limit, all_lengths, device)
         source, target = data[i]
         if not all_lengths and len(target) > cfg["max_target_len"]:
             continue
-        ids = tokenizer.encode_source(source)[: cfg["max_source_len"]]
-        out = generate_ids(
-            model,
-            ids,
-            cfg["max_new_tokens"],
-            tokenizer.eos_id,
-            tokenizer.sep_id,
-            device,
-        )
-        preds.append(tokenizer.decode_target(out))
+        preds.append(decode_document(model, tokenizer, cfg, source, device, max_chunks))
         refs.append(target)
     precision, recall, f1 = macro_prf(preds, refs)
     return {

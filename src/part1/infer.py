@@ -7,7 +7,7 @@ import torch
 from . import env
 from .config import load_config
 from .data import read_at, build_offsets
-from .generate import generate_ids
+from .generate import decode_document
 from .models.build import build_model
 from .tokenizer import Tokenizer
 
@@ -79,16 +79,11 @@ def main():
     os.makedirs(os.path.dirname(output), exist_ok=True)
     with open(output, "w", encoding="utf-8") as f:
         for record_id, ciphertext in records:
-            ids = tokenizer.encode_source(ciphertext)[: model_cfg["max_source_len"]]
-            out = generate_ids(
-                model,
-                ids,
-                model_cfg["max_new_tokens"],
-                tokenizer.eos_id,
-                tokenizer.sep_id,
-                device,
+            text = decode_document(
+                model, tokenizer, model_cfg, ciphertext, device,
+                model_cfg.get("eval_max_chunks"),
             )
-            f.write(json.dumps({"id": record_id, "text": tokenizer.decode_target(out)}) + "\n")
+            f.write(json.dumps({"id": record_id, "text": text}) + "\n")
     print(json.dumps({"records": len(records), "output": output, "checkpoint": checkpoint}))
 
 

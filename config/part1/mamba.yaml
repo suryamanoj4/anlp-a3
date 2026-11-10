@@ -6,9 +6,8 @@ val_split: validation
 max_tokens: 45000000
 val_max_docs: 400
 max_source_len: 128
-max_target_len: 112
+max_target_len: 128
 vocab_sample: 2000
-
 d_model: 384
 n_heads: 6
 n_layers: 6
@@ -22,21 +21,19 @@ expand: 4
 chunk: 64
 checkpoint_scan: false
 scan_chunk: 32
-
 batch_size: 16
 lr: 0.0003
 weight_decay: 0.01
 grad_clip: 1.0
 warmup_steps: 300
-max_steps: 9200
+max_steps: 5000
 max_minutes: null
 eval_interval: 500
 log_interval: 20
 gen_samples: 50
-max_new_tokens: 112
+max_new_tokens: 128
 precision: fp16
-workers: 2
-
+workers: 0
 out_dir: output/part1
 log_file: logs/part1/mamba.jsonl
 run_name: mamba
@@ -45,5 +42,7 @@ wandb_project: anlp-a3
 hf_pull: true
 final_eval: true
 eval_split: test
-eval_limit: 300
-eval_all_lengths: false
+eval_limit: 200
+eval_all_lengths: true
+patch_size: 128
+eval_max_chunks: 32
