@@ -1,5 +1,11 @@
 import json
 
+PUNCTUATION = set("!'+,-./:;<=>?[]_{}")
+
+
+def strip_source(text):
+    return "".join(ch for ch in text if ch not in PUNCTUATION)
+
 
 class Tokenizer:
     def __init__(self, source_chars, target_chars):
@@ -8,7 +14,8 @@ class Tokenizer:
         self.pad_id = 0
         self.sep_id = 1
         self.eos_id = 2
-        self.src_offset = 3
+        self.unk_id = 3
+        self.src_offset = 4
         self.src_stoi = {c: i + self.src_offset for i, c in enumerate(source_chars)}
         self.tgt_offset = self.src_offset + len(source_chars)
         self.tgt_stoi = {c: i + self.tgt_offset for i, c in enumerate(target_chars)}
@@ -17,12 +24,10 @@ class Tokenizer:
         self.vocab_size = self.tgt_offset + len(target_chars)
 
     def encode_source(self, text):
-        default = self.src_offset
-        return [self.src_stoi.get(c, default) for c in text]
+        return [self.src_stoi.get(c, self.unk_id) for c in strip_source(text)]
 
     def encode_target(self, text):
-        default = self.tgt_offset
-        return [self.tgt_stoi.get(c, default) for c in text]
+        return [self.tgt_stoi.get(c, self.unk_id) for c in text]
 
     def decode_target(self, ids):
         out = []
@@ -42,6 +47,6 @@ class Tokenizer:
             for i, (ls, lt) in enumerate(zip(fs, ft)):
                 if i >= limit:
                     break
-                source_chars.update(json.loads(ls)["ciphertext"])
+                source_chars.update(strip_source(json.loads(ls)["ciphertext"]))
                 target_chars.update(json.loads(lt)["text"])
         return Tokenizer(sorted(source_chars), sorted(target_chars))

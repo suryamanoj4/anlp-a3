@@ -2,13 +2,25 @@
 
 ## Tokenisation
 
-Character level, not BPE. The corpus uses 81 ciphertext symbols and 27 plaintext symbols, so the
-vocabulary is 111 tokens; a subword vocabulary would be larger than the alphabet and would add
-nothing. Ciphertext symbols are close to uniformly distributed (bigram entropy 12.54 of a possible
-12.68 bits) and share almost no mutual information with the plaintext at any offset, so merges
-learned from it would encode noise. Character level also keeps the reported metrics exact: character
-accuracy, Levenshtein distance and word accuracy are all defined on characters, and the held-out
-output is one string per id.
+Character level, not BPE. After the preprocessing below the source alphabet is 63 symbols (space,
+digits, upper and lower case) and the target alphabet is 27, giving a vocabulary of 94 tokens
+including padding, separator, end and unknown. A subword vocabulary would be larger than the alphabet
+and would add nothing. The mapping carries no usable signal (measured below), so merges learned from
+it would encode noise. Character level also keeps the reported metrics exact: character accuracy,
+Levenshtein distance and word accuracy are all defined on characters, and the held-out output is one
+string per id.
+
+## Punctuation removal and unknown tokens
+
+The ciphertext contains 18 punctuation symbols (`!'+,-./:;<=>?[]_{}`) that are inserted noise. Removing
+them makes ciphertext and plaintext lengths match for 100 percent of training pairs, with a mean length
+ratio of exactly 1.0000 instead of 1.1311. Roughly 13 percent of source tokens were pure padding
+otherwise. Removal is applied inside the tokeniser's source encoder, so it is identical during training
+and during held-out inference rather than being a one-off preprocessing script.
+
+A dedicated unknown token is used for source characters outside the vocabulary. Previously an unseen
+character was silently mapped to whichever source symbol sorts first, which would corrupt held-out
+input; now it is an explicit token. Unknown target tokens are dropped during decoding.
 
 ## Task formulation
 
