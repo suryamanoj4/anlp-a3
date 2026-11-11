@@ -7,8 +7,8 @@ else
   RUN="python"
 fi
 
-ROLL="${ROLL_NUMBER:-rollnumber}"
-ARCH="${BEST_ARCH:-transformer}"
+ROLL="${ROLL_NUMBER:-2026701036}"
+ARCH="${BEST_ARCH:-hybrid}"
 
 if [[ "${1:-}" == "--heldout" ]]; then
   $RUN -m src.part1.infer \
