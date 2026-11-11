@@ -9,7 +9,7 @@ from . import env
 from .config import load_config
 from .data import CipherPairs
 from .flops import count_parameters, estimate_flops
-from .generate import decode_document
+from .generate import predict_document
 from .infer import load_model
 from .metrics import char_accuracy, mean_edit_distance, macro_prf, word_accuracy
 
@@ -41,7 +41,7 @@ def generation_metrics(model, tokenizer, cfg, split, limit, all_lengths, device)
         source, target = data[i]
         if not all_lengths and len(target) > cfg["max_target_len"]:
             continue
-        preds.append(decode_document(model, tokenizer, cfg, source, device, max_chunks))
+        preds.append(predict_document(model, tokenizer, cfg, source, device, max_chunks))
         refs.append(target)
     precision, recall, f1 = macro_prf(preds, refs)
     return {

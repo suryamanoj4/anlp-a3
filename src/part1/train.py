@@ -11,20 +11,33 @@ from torch.utils.data import DataLoader
 
 from . import env
 from .config import load_config
-from .data import CipherPairs, LengthBucketSampler, PatchedPairs, limit_for_tokens, make_collate
+from .data import (
+    CipherPairs,
+    LengthBucketSampler,
+    PatchedPairs,
+    TransducerCollate,
+    limit_for_tokens,
+    make_collate,
+)
 from .evaluate import generation_metrics
 from .flops import count_parameters, estimate_flops
 from .models.build import build_model
 from .tokenizer import Tokenizer
 
 
-def compute_loss(model, input_ids, label_ids, attention_mask, label_smoothing=0.0):
+def compute_loss(model, input_ids, label_ids, attention_mask, label_smoothing=0.0, head=None, shift=True):
     logits = model(input_ids, attention_mask)
-    shift_logits = logits[:, :-1, :].contiguous()
-    shift_labels = label_ids[:, 1:].contiguous()
+    if head is not None:
+        offset, classes = head
+        logits = logits[:, :, offset:offset + classes]
+    if shift:
+        logits = logits[:, :-1, :]
+        label_ids = label_ids[:, 1:]
+    logits = logits.contiguous()
+    labels = label_ids.contiguous()
     return F.cross_entropy(
-        shift_logits.view(-1, shift_logits.size(-1)),
-        shift_labels.view(-1),
+        logits.view(-1, logits.size(-1)),
+        labels.view(-1),
         ignore_index=-100,
         label_smoothing=label_smoothing,
     )
@@ -38,7 +51,7 @@ def lr_factor(step, warmup, total):
 
 
 @torch.no_grad()
-def validation_loss(model, loader, device, max_batches=60):
+def validation_loss(model, loader, device, max_batches=60, head=None, shift=True):
     model.eval()
     total = 0.0
     count = 0
@@ -46,7 +59,7 @@ def validation_loss(model, loader, device, max_batches=60):
         input_ids = input_ids.to(device)
         label_ids = label_ids.to(device)
         attention_mask = attention_mask.to(device)
-        total += float(compute_loss(model, input_ids, label_ids, attention_mask))
+        total += float(compute_loss(model, input_ids, label_ids, attention_mask, head=head, shift=shift))
         count += 1
         if count >= max_batches:
             break
@@ -99,7 +112,8 @@ def main():
         val_set = PatchedPairs(
             root, cfg["val_split"], patch_size, val_docs, cfg.get("warmup_chars", 0)
         )
-        collate = make_collate(tokenizer, patch_size, patch_size)
+        transducer = cfg.get("formulation") == "transducer"
+        collate = TransducerCollate(tokenizer) if transducer else make_collate(tokenizer, patch_size, patch_size)
         loader = DataLoader(
             train_set,
             batch_size=cfg["batch_size"],
@@ -115,6 +129,7 @@ def main():
             num_workers=0,
         )
     else:
+        transducer = cfg.get("formulation") == "transducer"
         train_set = CipherPairs(
             root, cfg["train_split"], cfg.get("max_tokens"), cfg.get("max_docs")
         )
@@ -169,6 +184,7 @@ def main():
             config=cfg,
         )
 
+    head = (tokenizer.tgt_offset, len(tokenizer.target_chars)) if cfg.get("formulation") == "transducer" else None
     step = 0
     best = float("inf")
     saved = False
@@ -196,6 +212,7 @@ def main():
                 loss = compute_loss(
                     model, input_ids, label_ids, attention_mask,
                     cfg.get("label_smoothing", 0.0),
+                    head=head, shift=not transducer,
                 )
             optimizer.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
@@ -221,7 +238,7 @@ def main():
                 if run is not None:
                     run.log(record, step=step)
             if step % cfg["eval_interval"] == 0:
-                val = validation_loss(model, val_loader, device)
+                val = validation_loss(model, val_loader, device, head=head, shift=not transducer)
                 metrics = {
                     "step": step,
                     "split": "validation",

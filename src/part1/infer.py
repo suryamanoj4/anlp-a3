@@ -7,7 +7,7 @@ import torch
 from . import env
 from .config import load_config
 from .data import read_at, build_offsets
-from .generate import decode_document
+from .generate import predict_document
 from .models.build import build_model
 from .tokenizer import Tokenizer
 
@@ -79,7 +79,7 @@ def main():
     os.makedirs(os.path.dirname(output), exist_ok=True)
     with open(output, "w", encoding="utf-8") as f:
         for record_id, ciphertext in records:
-            text = decode_document(
+            text = predict_document(
                 model, tokenizer, model_cfg, ciphertext, device,
                 model_cfg.get("eval_max_chunks"),
             )

@@ -49,3 +49,4 @@ eval_max_chunks: 16
 eval_max_minutes: 8
 label_smoothing: 0.1
 warmup_chars: 4
+formulation: transducer

@@ -152,5 +152,32 @@ class Collate:
         return input_ids, label_ids, attention_mask
 
 
+class TransducerCollate:
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+
+    def __call__(self, batch):
+        tokenizer = self.tokenizer
+        inputs = []
+        labels = []
+        for source, target in batch:
+            s = tokenizer.encode_source(source)
+            t = [tokenizer.tgt_stoi.get(c, 0) - tokenizer.tgt_offset for c in target]
+            pad = max(0, len(s) - len(t))
+            lab = [-100] * pad + t
+            lab = lab[:len(s)]
+            inputs.append(s)
+            labels.append(lab)
+        width = max(len(x) for x in inputs)
+        input_ids = torch.full((len(inputs), width), tokenizer.pad_id, dtype=torch.long)
+        label_ids = torch.full((len(inputs), width), -100, dtype=torch.long)
+        attention_mask = torch.zeros((len(inputs), width), dtype=torch.long)
+        for i, (ids, lab) in enumerate(zip(inputs, labels)):
+            input_ids[i, :len(ids)] = torch.tensor(ids)
+            label_ids[i, :len(lab)] = torch.tensor(lab)
+            attention_mask[i, :len(ids)] = 1
+        return input_ids, label_ids, attention_mask
+
+
 def make_collate(tokenizer, max_source_len, max_target_len):
     return Collate(tokenizer, max_source_len, max_target_len)
