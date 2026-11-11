@@ -3,8 +3,8 @@ arch: deltanet
 data_root: data_new
 train_split: train
 val_split: validation
-max_tokens: 45000000
-val_max_docs: 400
+max_tokens: null
+val_max_docs: 1000
 max_source_len: 68
 max_target_len: 64
 vocab_sample: 2000
@@ -48,3 +48,4 @@ eval_max_minutes: 8
 label_smoothing: 0.1
 warmup_chars: 4
 formulation: transducer
+max_docs: 100000
