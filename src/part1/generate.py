@@ -28,12 +28,17 @@ def generate_ids(model, source_ids, max_new_tokens, eos_id, sep_id, device):
 def decode_document(model, tokenizer, cfg, ciphertext, device, max_chunks=None):
     text = strip_source(ciphertext)
     size = cfg.get("patch_size") or cfg.get("max_source_len", 128)
-    chunks = [text[i:i + size] for i in range(0, len(text), size)] or [""]
+    warmup = cfg.get("warmup_chars", 0)
+    bounds = []
+    for start in range(0, len(text), size):
+        bounds.append((max(0, start - warmup), min(start + size, len(text))))
+    if not bounds:
+        bounds = [(0, 0)]
     if max_chunks is not None:
-        chunks = chunks[:max_chunks]
+        bounds = bounds[:max_chunks]
     parts = []
-    for chunk in chunks:
-        ids = tokenizer.encode_source(chunk)
+    for src_start, end in bounds:
+        ids = tokenizer.encode_source(text[src_start:end])
         out = generate_ids(
             model,
             ids,

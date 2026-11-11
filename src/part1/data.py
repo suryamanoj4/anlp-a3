@@ -62,10 +62,11 @@ class CipherPairs(Dataset):
 
 
 class PatchedPairs(Dataset):
-    def __init__(self, root, split, patch_size, max_docs=None):
+    def __init__(self, root, split, patch_size, max_docs=None, warmup=0):
         self.source_path = f"{root}/{split}/cipher.jsonl"
         self.target_path = f"{root}/{split}/cleaned.jsonl"
         self.patch_size = patch_size
+        self.warmup = warmup
         self.source_offsets, _ = build_offsets(self.source_path, max_docs)
         self.target_offsets, _ = build_offsets(self.target_path, max_docs)
         self.cumulative = []
@@ -83,14 +84,14 @@ class PatchedPairs(Dataset):
 
     def __getitem__(self, index):
         doc = bisect_right(self.cumulative, index)
-        start = (index - (self.cumulative[doc - 1] if doc else 0)) * self.patch_size
         source = strip_source(
             read_at(self.source_path, self.source_offsets, doc)["ciphertext"]
         )
         target = read_at(self.target_path, self.target_offsets, doc)["text"]
-        width = min(len(source), len(target))
+        start = (index - (self.cumulative[doc - 1] if doc else 0)) * self.patch_size
+        src_start = max(0, start - self.warmup)
         return (
-            source[start:start + self.patch_size],
+            source[src_start:start + self.patch_size],
             target[start:start + self.patch_size],
         )
 

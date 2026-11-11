@@ -93,8 +93,12 @@ def main():
             val_docs = limit_for_tokens(
                 f"{root}/{cfg['val_split']}/cleaned.jsonl", cfg["val_max_tokens"]
             )
-        train_set = PatchedPairs(root, cfg["train_split"], patch_size, train_docs)
-        val_set = PatchedPairs(root, cfg["val_split"], patch_size, val_docs)
+        train_set = PatchedPairs(
+            root, cfg["train_split"], patch_size, train_docs, cfg.get("warmup_chars", 0)
+        )
+        val_set = PatchedPairs(
+            root, cfg["val_split"], patch_size, val_docs, cfg.get("warmup_chars", 0)
+        )
         collate = make_collate(tokenizer, patch_size, patch_size)
         loader = DataLoader(
             train_set,
