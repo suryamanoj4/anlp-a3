@@ -1,0 +1,10 @@
+{
+  "arch": "transformer",
+  "parameters": 4918272,
+  "flops": 1370738688,
+  "best_val_loss": 2.8532191117604575,
+  "steps": 10000,
+  "tokens_seen": 10371681,
+  "elapsed_min": 5.93,
+  "checkpoint": "models/part1/transformer.pt"
+}

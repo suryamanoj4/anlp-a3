@@ -1,0 +1,14 @@
+{
+  "split": "test",
+  "documents": 108,
+  "short_only": true,
+  "char_accuracy": 0.08203350664355864,
+  "word_accuracy": 0.009259259259259259,
+  "precision": 0.051623984218135424,
+  "recall": 0.04906453785573414,
+  "f1": 0.047718263841145005,
+  "edit_distance": 14.824074074074074,
+  "parameters": 11106954,
+  "flops": 8731607040,
+  "arch": "hybrid"
+}

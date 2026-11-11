@@ -1,0 +1,10 @@
+{
+  "arch": "mamba",
+  "parameters": 5171392,
+  "flops": 2809061376,
+  "best_val_loss": 2.849330802758535,
+  "steps": 10000,
+  "tokens_seen": 10376193,
+  "elapsed_min": 13.07,
+  "checkpoint": "models/part1/mamba.pt"
+}

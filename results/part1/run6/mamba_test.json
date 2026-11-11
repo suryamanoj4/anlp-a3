@@ -1,0 +1,15 @@
+{
+  "split": "test",
+  "documents": 100,
+  "short_only": false,
+  "stopped_early": false,
+  "char_accuracy": 0.09208119562792773,
+  "word_accuracy": 0.09,
+  "precision": 0.7194418364973038,
+  "recall": 0.023778161211036708,
+  "f1": 0.02041086806512591,
+  "edit_distance": 735.95,
+  "parameters": 5171392,
+  "flops": 2809061376,
+  "arch": "mamba"
+}

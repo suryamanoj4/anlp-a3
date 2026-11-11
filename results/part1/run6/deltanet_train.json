@@ -1,0 +1,10 @@
+{
+  "arch": "deltanet",
+  "parameters": 4817944,
+  "flops": 1517936640,
+  "best_val_loss": 2.8506622393925984,
+  "steps": 10000,
+  "tokens_seen": 10374230,
+  "elapsed_min": 15.16,
+  "checkpoint": "models/part1/deltanet.pt"
+}

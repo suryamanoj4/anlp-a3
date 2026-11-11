@@ -11,6 +11,7 @@ wheels/
 
 # Data and model artifacts
 /data/
+/data_new/
 /models/
 /logs/
 *.zip
@@ -22,3 +23,6 @@ wheels/
 
 # Secrets
 .env
+
+# Local report drafting notes
+docs/REPORT_NOTES.md

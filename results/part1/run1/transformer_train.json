@@ -1,0 +1,24 @@
+{
+  "arch": "transformer",
+  "parameters": 10916352,
+  "flops": 5675950080,
+  "best_val_loss": 1.407203712463379,
+  "steps": 9200,
+  "tokens_seen": 19134323,
+  "elapsed_min": 6.52,
+  "checkpoint": "models/part1/transformer.pt",
+  "test": {
+    "split": "test",
+    "documents": 108,
+    "short_only": true,
+    "char_accuracy": 0.09705372616984402,
+    "word_accuracy": 0.046296296296296294,
+    "precision": 0.08667476821083034,
+    "recall": 0.07206103597806726,
+    "f1": 0.07418156783375915,
+    "edit_distance": 13.416666666666666,
+    "parameters": 10916352,
+    "flops": 5675950080,
+    "eval_minutes": 0.16
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "arch": "hybrid",
+  "parameters": 4994668,
+  "flops": 2163499008,
+  "best_val_loss": 2.8477049311002096,
+  "steps": 10000,
+  "tokens_seen": 10382390,
+  "elapsed_min": 10.98,
+  "checkpoint": "models/part1/hybrid.pt"
+}
