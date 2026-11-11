@@ -22,7 +22,7 @@ chunk: 64
 checkpoint_scan: false
 scan_chunk: 32
 batch_size: 16
-lr: 0.0008
+lr: 0.0003
 weight_decay: 0.01
 grad_clip: 1.0
 warmup_steps: 500
@@ -51,3 +51,4 @@ label_smoothing: 0.1
 warmup_chars: 4
 formulation: transducer
 max_docs: 100000
+hf_repo: Surya4/anlp-a3-part1

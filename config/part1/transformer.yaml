@@ -49,3 +49,4 @@ label_smoothing: 0.1
 warmup_chars: 4
 formulation: transducer
 max_docs: 100000
+hf_repo: Surya4/anlp-a3-part1
