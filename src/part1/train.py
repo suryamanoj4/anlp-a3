@@ -18,7 +18,7 @@ from .models.build import build_model
 from .tokenizer import Tokenizer
 
 
-def compute_loss(model, input_ids, label_ids, attention_mask):
+def compute_loss(model, input_ids, label_ids, attention_mask, label_smoothing=0.0):
     logits = model(input_ids, attention_mask)
     shift_logits = logits[:, :-1, :].contiguous()
     shift_labels = label_ids[:, 1:].contiguous()
@@ -26,6 +26,7 @@ def compute_loss(model, input_ids, label_ids, attention_mask):
         shift_logits.view(-1, shift_logits.size(-1)),
         shift_labels.view(-1),
         ignore_index=-100,
+        label_smoothing=label_smoothing,
     )
 
 
@@ -188,7 +189,10 @@ def main():
                 else contextlib.nullcontext()
             )
             with amp:
-                loss = compute_loss(model, input_ids, label_ids, attention_mask)
+                loss = compute_loss(
+                    model, input_ids, label_ids, attention_mask,
+                    cfg.get("label_smoothing", 0.0),
+                )
             optimizer.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
