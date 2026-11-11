@@ -38,7 +38,7 @@ run_name: transformer
 wandb: true
 wandb_project: anlp-a3
 hf_pull: true
-final_eval: true
+final_eval: false
 eval_split: test
 eval_limit: 100
 eval_all_lengths: true

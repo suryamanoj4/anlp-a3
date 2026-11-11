@@ -5,12 +5,23 @@ import time
 
 import torch
 
+from . import env
 from .config import load_config
 from .data import CipherPairs
 from .flops import count_parameters, estimate_flops
 from .generate import decode_document
 from .infer import load_model
 from .metrics import char_accuracy, mean_edit_distance, macro_prf, word_accuracy
+
+EVAL_KEYS = [
+    "data_root",
+    "patch_size",
+    "max_source_len",
+    "max_target_len",
+    "max_new_tokens",
+    "eval_max_chunks",
+    "eval_max_minutes",
+]
 
 
 def generation_metrics(model, tokenizer, cfg, split, limit, all_lengths, device):
@@ -56,16 +67,25 @@ def main():
     parser.add_argument("--config", required=True)
     parser.add_argument("--checkpoint", default=None)
     parser.add_argument("--split", default="test")
-    parser.add_argument("--limit", type=int, default=300)
+    parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--all-lengths", action="store_true")
     parser.add_argument("--output", default=None)
+    parser.add_argument("--wandb", action="store_true")
     args = parser.parse_args()
     cfg = load_config(args.config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = args.checkpoint or f"models/part1/{cfg['run_name']}.pt"
     model, tokenizer, model_cfg = load_model(checkpoint, device)
+
+    eval_cfg = dict(model_cfg)
+    for key in EVAL_KEYS:
+        if key in cfg:
+            eval_cfg[key] = cfg[key]
+
+    limit = args.limit if args.limit is not None else cfg.get("eval_limit", 100)
+    all_lengths = bool(args.all_lengths or cfg.get("eval_all_lengths", False))
     result = generation_metrics(
-        model, tokenizer, model_cfg, args.split, args.limit, args.all_lengths, device
+        model, tokenizer, eval_cfg, args.split, limit, all_lengths, device
     )
     result["arch"] = cfg.get("arch")
     output = args.output or f"results/part1/{cfg['run_name']}_{args.split}.json"
@@ -73,6 +93,19 @@ def main():
     with open(output, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
     print(json.dumps(result))
+
+    if args.wandb:
+        import wandb
+
+        env.apply_wandb_key()
+        run = wandb.init(
+            project=env.wandb_project(cfg.get("wandb_project", "anlp-a3")),
+            entity=env.wandb_entity(),
+            name=f"{cfg.get('arch')}-evals",
+            config=cfg,
+        )
+        run.log({f"test/{k}": v for k, v in result.items() if isinstance(v, (int, float))})
+        run.finish()
 
 
 if __name__ == "__main__":

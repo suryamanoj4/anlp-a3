@@ -7,11 +7,12 @@ else
   RUN="python"
 fi
 
-LIMIT="${LIMIT:-300}"
+LIMIT="${LIMIT:-100}"
 
-for name in transformer mamba deltanet hybrid; do
+for name in transformer deltanet mamba hybrid; do
   $RUN -m src.part1.evaluate \
     --config "config/part1/${name}.yaml" \
     --split test \
-    --limit "$LIMIT"
+    --limit "$LIMIT" \
+    --wandb
 done
