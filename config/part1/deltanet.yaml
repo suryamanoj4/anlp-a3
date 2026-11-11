@@ -40,7 +40,8 @@ wandb_project: anlp-a3
 hf_pull: true
 final_eval: true
 eval_split: test
-eval_limit: 200
+eval_limit: 100
 eval_all_lengths: true
 patch_size: 128
-eval_max_chunks: 32
+eval_max_chunks: 8
+eval_max_minutes: 8

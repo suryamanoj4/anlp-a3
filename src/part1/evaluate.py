@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import time
 
 import torch
 
@@ -16,10 +17,15 @@ def generation_metrics(model, tokenizer, cfg, split, limit, all_lengths, device)
     model.eval()
     data = CipherPairs(cfg["data_root"], split)
     max_chunks = cfg.get("eval_max_chunks")
+    deadline = time.time() + cfg.get("eval_max_minutes", 15) * 60
     preds = []
     refs = []
+    stopped_early = False
     for i in range(len(data)):
         if len(preds) >= limit:
+            break
+        if time.time() > deadline:
+            stopped_early = True
             break
         source, target = data[i]
         if not all_lengths and len(target) > cfg["max_target_len"]:
@@ -31,6 +37,7 @@ def generation_metrics(model, tokenizer, cfg, split, limit, all_lengths, device)
         "split": split,
         "documents": len(preds),
         "short_only": not all_lengths,
+        "stopped_early": stopped_early,
         "char_accuracy": char_accuracy(preds, refs),
         "word_accuracy": word_accuracy(preds, refs),
         "precision": precision,
