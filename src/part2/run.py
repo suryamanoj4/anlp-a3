@@ -35,6 +35,8 @@ DEFAULTS = {
     "details": "results/part2/details.json",
     "curves": "results/part2/curves.json",
     "log": "logs/part2/run.jsonl",
+    "model_dir": "models/part2",
+    "save_models": True,
     "wandb": True,
     "wandb_project": "anlp-a3-part2",
 }

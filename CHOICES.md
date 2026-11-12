@@ -293,3 +293,12 @@ end-to-end in minutes rather than in the time the full grid takes; it is not the
 WandB project `anlp-a3-part2`, one run per configuration named `part2-<arch>-<feature>` for training
 curves, and a matching `part2-<arch>-<feature>-evals` run for the test metrics and their mean and
 standard deviation across seeds.
+
+## Checkpoints and HuggingFace
+
+The general instructions require the models to be pushed to HuggingFace, so every Part B run writes the
+best-validation-F1 state dict to `models/part2/<arch>_<feature>_seed<seed>.pt`. Each file holds the
+weights, the architecture and feature name, the seed, the training configuration, the best epoch and
+the test metrics, so it can be reloaded without the surrounding run directory. The nine trained
+configurations (five architectures on BERT, plus GraphSAGE on the four feature types, five seeds each)
+are published at https://huggingface.co/Surya4/anlp-a3-part2.

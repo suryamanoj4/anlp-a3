@@ -1,4 +1,5 @@
 import copy
+import os
 import random
 import time
 
@@ -125,6 +126,32 @@ def run_once(cfg, arch, feature, seed, bundle, device, on_epoch=None):
     test_metrics, y_true, y_pred, _ = predict(
         model, test_loader, device, classes
     )
+    test_binary = binary_metrics(y_true, y_pred, positive=1)
+    checkpoint = None
+    if cfg.get("save_models", True) and best_state is not None:
+        model_dir = cfg["model_dir"]
+        os.makedirs(model_dir, exist_ok=True)
+        checkpoint = os.path.join(
+            model_dir, f"{arch}_{feature}_seed{seed}.pt"
+        )
+        torch.save(
+            {
+                "model": {
+                    key: value.detach().cpu()
+                    for key, value in best_state.items()
+                },
+                "config": {k: v for k, v in cfg.items() if k != "seeds"},
+                "arch": arch,
+                "feature": feature,
+                "seed": seed,
+                "in_dim": in_dim,
+                "num_classes": classes,
+                "best_epoch": best_epoch,
+                "best_val": best_val,
+                "test": test_metrics,
+            },
+            checkpoint,
+        )
     return {
         "arch": arch,
         "feature": feature,
@@ -132,7 +159,8 @@ def run_once(cfg, arch, feature, seed, bundle, device, on_epoch=None):
         "best_epoch": best_epoch,
         "best_val": best_val,
         "test": test_metrics,
-        "test_binary": binary_metrics(y_true, y_pred, positive=1),
+        "test_binary": test_binary,
+        "checkpoint": checkpoint,
         "epochs": len(history),
         "seconds": round(time.time() - started, 2),
         "parameters": sum(p.numel() for p in model.parameters()),
