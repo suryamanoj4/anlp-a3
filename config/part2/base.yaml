@@ -1,0 +1,24 @@
+data_root: data/part2
+dataset: gossipcop
+hidden: 128
+layers: 2
+heads: 4
+dropout: 0.5
+dropedge: 0.2
+batch_size: 32
+lr: 0.001
+weight_decay: 0.0005
+max_epochs: 100
+patience: 20
+seeds: [0, 1, 2, 3, 4]
+normalize: true
+archs: [mlp, gcn, sage, gat, bigcn]
+arch_feature: bert
+ablation_backbone: sage
+ablation_features: [profile, spacy, bert, content]
+output: output/part2/results.json
+details: results/part2/details.json
+curves: results/part2/curves.json
+log: logs/part2/run.jsonl
+wandb: true
+wandb_project: anlp-a3-part2
