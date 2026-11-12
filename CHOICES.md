@@ -190,3 +190,106 @@ complete in roughly the same wall-clock window. Steps and batch size are held eq
 architectures so that the comparison is of architectures rather than of optimisation budgets; tokens
 seen and FLOPs are reported alongside.
 
+
+# Part 2 choices
+
+## Which Bi-GCN
+
+"Bi-GCN" in this assignment refers to Bian et al., *Rumor Detection on Social Media with Bi-Directional
+Graph Convolutional Networks* (AAAI 2020, arXiv 2001.06362). A second, unrelated paper also calls
+itself BiGCN: Chen et al., *BiGCN: A Bi-directional Low-Pass Filtering Graph Neural Network*
+(arXiv 2101.05519). That model filters a node graph and a learned latent feature graph in two
+directions; it is a node-classification method for a single attributed graph and has no notion of a
+root post or a propagation tree. Since this assignment is about propagation graphs, Bian et al. is the
+matching reference, and it is also the BiGCN baseline used in the UPFD literature.
+
+The implementation follows Bian et al. directly:
+
+- top-down GCN on the parent-to-child adjacency and bottom-up GCN on its transpose, with separate
+  weights and two layers each;
+- root feature enhancement, concatenating the root hidden vector of the previous layer to every node
+  at every layer;
+- DropEdge on the directed edges at rate 0.2, then the transpose for the bottom-up branch;
+- mean pooling over each direction, concatenation of the two pooled vectors, and a linear classifier.
+
+## Dataset and split
+
+PyG's `UPFD` loader with `name="gossipcop"` downloads and caches under `data/part2`. The provided
+20/10/70 split is used exactly as shipped: `train.pt`, `val.pt`, `test.pt`. No resampling, no
+re-splitting, and no merging of splits.
+
+## Edge orientation
+
+UPFD stores edges with a fixed direction per dataset but does not document which. The loader checks,
+over the first 256 training graphs, whether edges point into the local root node 0. If they do, the
+stored direction is child-to-parent and the edge index is flipped once per batch so that the top-down
+branch always aggregates parent-to-child. The inferred direction is printed at the start of every run
+and recorded in `results/part2/details.json`. The same check also reports the fraction of edges whose
+reverse is present, so an accidentally undirected graph would be visible in the log rather than
+silently collapsing the two branches.
+
+## Feature standardisation
+
+Each feature type is standardised per dimension with the mean and standard deviation of the training
+split only. The transform is identical for all four feature types and for all architectures; only the
+input data changes. This keeps the ten-dimensional profile features and the 768-dimensional BERT
+features on comparable scales without giving any configuration a different preprocessing step. A
+dimension whose training standard deviation is below `1e-6` is left unscaled.
+
+## Metrics
+
+The task is binary. Accuracy is reported as-is, and precision, recall and F1 are **macro-averaged over
+the two classes**, so the numbers do not depend on which label is called positive. Per-class counts and
+the binary (positive = class 1) metrics are also written to `results/part2/details.json` for the report,
+but the values in `results/part2/results.json` and `output/part2/results.json` are the macro means.
+
+Five seeds are used, `0` to `4`. The reported deviation is the population standard deviation across
+the five test scores (`ddof=0`), not the standard error.
+
+## Training protocol
+
+One protocol is shared by every architecture and every feature type so that the comparison is of models
+and not of tuning budgets:
+
+| Setting | Value |
+|---|---|
+| Hidden width | 128 |
+| Layers | 2 |
+| Dropout | 0.5 |
+| DropEdge (Bi-GCN only) | 0.2 |
+| GAT heads | 4 on the first layer, 1 on the second |
+| Optimiser | Adam, lr 1e-3, weight decay 5e-4 |
+| Batch size | 32 |
+| Maximum epochs | 100 |
+| Early stopping | validation macro-F1, patience 20 |
+| Checkpoint | the epoch with the best validation macro-F1 |
+
+The best-validation-F1 checkpoint is the one evaluated on test, as the assignment requires. It is not
+the best-loss checkpoint. Training is seeded with `random`, `numpy` and `torch` together, cuDNN runs in
+deterministic mode, and the shuffling generator is seeded per run.
+
+The Bi-GCN root enhancement doubles the width entering each layer and the pooled representation, which
+is a property of the published model rather than a tuning choice; its parameter count is reported
+alongside the others so the comparison is not hidden.
+
+## Deduplicated configurations
+
+`GraphSAGE` with BERT features is both the `sage` row of the architecture comparison and the `bert`
+row of the feature ablation. It is trained once and used for both rows, because the protocol, the seed
+and the data are identical. Writing the same number twice from two independent runs would be
+redundant.
+
+## Entry point
+
+`bash ./scripts/part2/test_gnn.sh` runs the full grid: five architectures on BERT, plus GraphSAGE on
+profile, spaCy, BERT and content, five seeds each, and writes `output/part2/results.json`.
+
+`bash ./scripts/part2/test_gnn.sh --ta` runs the same pipeline with the first seed only and writes
+`output/part2/results_ta.json`. The `--ta` variant exists so the marker can verify the full pipeline
+end-to-end in minutes rather than in the time the full grid takes; it is not the submitted result.
+
+## Experiment tracking
+
+WandB project `anlp-a3-part2`, one run per configuration named `part2-<arch>-<feature>` for training
+curves, and a matching `part2-<arch>-<feature>-evals` run for the test metrics and their mean and
+standard deviation across seeds.
